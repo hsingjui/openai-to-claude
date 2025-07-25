@@ -1,0 +1,26 @@
+{
+  "openai": {
+    "api_key": "your-openai-api-key-here",
+    "base_url": "https://api.openai.com/v1"
+  },
+  "server": {
+    "host": "0.0.0.0",
+    "port": 8000
+  },
+  "api_key": "your-proxy-api-key-here",
+  "logging": {
+    "level": "INFO"
+  },
+  "models": {
+    "default": "Qwen/Qwen3-Coder",
+    "small": "deepseek-ai/DeepSeek-V3-0324",
+    "think": "deepseek-ai/DeepSeek-R1-0528",
+    "longContext": "gemini-2.5-pro"
+  },
+  "parameter_overrides": {
+    "max_tokens": null,
+    "temperature": null,
+    "top_p": null,
+    "top_k": null
+  }
+}

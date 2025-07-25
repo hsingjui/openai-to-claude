@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  proxy:
+    container_name: openai-to-claude # 指定容器名称
+    build: .
+    ports:
+      - "8000:8000"  # 将主机的8000端口映射到容器的8000端口
+    volumes:
+      - ./config:/app/config  # 挂载配置文件目录
+      - ./logs:/app/logs      # 挂载日志目录
+    restart: unless-stopped  # 容器在停止后会自动重启，除非手动停止
