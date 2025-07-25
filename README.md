@@ -6,7 +6,7 @@
 
 High-performance proxy service that converts OpenAI API to Anthropic API compatible format. Allows developers to seamlessly call OpenAI models using existing Anthropic client code.
 
-[中文版本](README.md)
+[中文版本](README_zh.md)
 
 ## 🌟 Core Features
 
