@@ -180,7 +180,6 @@ tmp/
 .temp/
 
 # Docker
-.dockerignore
 
 # 
 .claude
