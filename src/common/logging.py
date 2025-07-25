@@ -27,9 +27,17 @@ def configure_logging(log_config) -> None:
     # 移除默认的handler
     logger.remove()
 
-    # 确保日志目录存在
+    # 使用相对路径而不是绝对路径
     log_path = Path("logs/app.log")
+    
+    # 确保日志目录存在，并设置正确的权限
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    # 设置目录权限为755，确保当前用户可写
+    log_path.parent.chmod(0o755)
+    
+    # 如果日志文件已存在，确保其可写
+    if log_path.exists():
+        log_path.chmod(0o644)
 
     # 控制台日志格式（包含请求ID）
     console_format = "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{extra[request_id]}</cyan> | <cyan>{name}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
@@ -50,7 +58,7 @@ def configure_logging(log_config) -> None:
 
     # 配置文件日志（包含截取的异常堆栈）
     logger.add(
-        "logs/app.log",
+        str(log_path),
         format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {extra[request_id]} | {name}:{line} | {message}",
         level=log_config.level,
         rotation="10 MB",

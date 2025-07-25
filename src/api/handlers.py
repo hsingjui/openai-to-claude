@@ -106,7 +106,7 @@ class MessagesHandler:
 
         except ValidationError as e:
             bound_logger.warning(f"Validation error - Errors: {e.errors()}")
-            error_response = await get_error_response(
+            error_response = get_error_response(
                 422, details={"validation_errors": e.errors(), "request_id": request_id}
             )
             raise HTTPException(status_code=422, detail=error_response.model_dump())
@@ -116,7 +116,7 @@ class MessagesHandler:
             bound_logger.exception(
                 f"JSON解析错误 - Error: {str(e)}, Position: {e.pos if hasattr(e, 'pos') else 'unknown'}"
             )
-            error_response = await get_error_response(
+            error_response = get_error_response(
                 502,
                 message="上游服务返回无效JSON格式",
                 details={"json_error": str(e), "request_id": request_id},
@@ -127,7 +127,7 @@ class MessagesHandler:
             bound_logger.exception(
                 f"处理非流式消息请求错误 - Type: {type(e).__name__}, Error: {str(e)}"
             )
-            error_response = await get_error_response(
+            error_response = get_error_response(
                 500, message=str(e), details={"request_id": request_id}
             )
             raise HTTPException(status_code=500, detail=error_response.model_dump())
@@ -179,7 +179,7 @@ class MessagesHandler:
         except (ValidationError, ValueError) as e:
             error_detail = e.errors() if hasattr(e, "errors") else str(e)
             bound_logger.warning(f"流式请求验证失败 - Errors: {error_detail}")
-            error_response = await get_error_response(422, message=str(error_detail))
+            error_response = get_error_response(422, message=str(error_detail))
             # 在错误响应中添加请求ID
             error_data = error_response.model_dump()
             if request_id:
@@ -191,7 +191,7 @@ class MessagesHandler:
             bound_logger.exception(
                 f"流式模式JSON解析错误 - Error: {str(e)}, Position: {e.pos if hasattr(e, 'pos') else 'unknown'}"
             )
-            error_response = await get_error_response(
+            error_response = get_error_response(
                 502,
                 message="流式响应中发现无效JSON格式",
                 details={"json_error": str(e), "request_id": request_id},
@@ -205,7 +205,7 @@ class MessagesHandler:
             bound_logger.exception(
                 f"流式请求处理错误 - Type: {type(e).__name__}, Error: {str(e)}"
             )
-            error_response = await get_error_response(500, message=str(e))
+            error_response = get_error_response(500, message=str(e))
             # 在错误响应中添加请求ID
             error_data = error_response.model_dump()
             if request_id:
@@ -307,7 +307,7 @@ async def messages_endpoint(request: Request, background_tasks: BackgroundTasks)
 
     except ValidationError as e:
         bound_logger.warning(f"请求验证失败 - Errors: {e.errors()}")
-        error_response = await get_error_response(
+        error_response = get_error_response(
             422, details={"validation_errors": e.errors()}
         )
         error_detail = error_response.model_dump()
@@ -316,7 +316,7 @@ async def messages_endpoint(request: Request, background_tasks: BackgroundTasks)
 
     except json.JSONDecodeError as e:
         bound_logger.warning(f"请求中的JSON格式错误 - Error: {str(e)}")
-        error_response = await get_error_response(400, message="无效的JSON格式")
+        error_response = get_error_response(400, message="无效的JSON格式")
         error_detail = error_response.model_dump()
         error_detail["request_id"] = request_id
         raise HTTPException(status_code=400, detail=error_detail)
@@ -330,7 +330,7 @@ async def messages_endpoint(request: Request, background_tasks: BackgroundTasks)
         bound_logger.exception(
             f"在messages端点发生意外错误 - Type: {type(e).__name__}, Error: {str(e)}"
         )
-        error_response = await get_error_response(500, message=str(e))
+        error_response = get_error_response(500, message=str(e))
         error_detail = error_response.model_dump()
         error_detail["request_id"] = request_id
         raise HTTPException(status_code=500, detail=error_detail)

@@ -135,23 +135,28 @@ ERROR_CODE_MAPPING = {
 def format_compact_traceback(error: Exception, max_lines: int = 10) -> str:
     """格式化紧凑的错误堆栈信息，只保留项目相关部分"""
     import traceback
-    
-    error_traceback = "".join(traceback.format_exception(type(error), error, error.__traceback__))
-    lines = error_traceback.split('\n')
-    
+
+    error_traceback = "".join(
+        traceback.format_exception(type(error), error, error.__traceback__)
+    )
+    lines = error_traceback.split("\n")
+
     # 过滤出项目相关的行
     filtered_lines = []
     for line in lines:
-        if ('openai-claude-code-proxy/src' in line or 
-            line.strip().startswith('File "/Users') or
-            any(keyword in line for keyword in ['Error:', 'Exception:', '    ']) or
-            line.strip() == ''):
+        if (
+            "openai-claude-code-proxy/src" in line
+            or line.strip().startswith('File "/Users')
+            or any(keyword in line for keyword in ["Error:", "Exception:", "    "])
+            or line.strip() == ""
+        ):
             filtered_lines.append(line)
-    
-    # 只保留最后max_lines行
-    return '\n'.join(filtered_lines[-max_lines:]) if filtered_lines else str(error)
 
-async def get_error_response(
+    # 只保留最后max_lines行
+    return "\n".join(filtered_lines[-max_lines:]) if filtered_lines else str(error)
+
+
+def get_error_response(
     status_code: int,
     message: str | None = None,
     details: dict[str, Any] | None = None,

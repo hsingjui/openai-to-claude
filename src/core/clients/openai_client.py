@@ -214,7 +214,9 @@ class OpenAIServiceClient:
         )
 
         # 在DEBUG级别下记录完整请求数据
-        bound_logger.debug(f"完整请求数据: {request_dict}")
+        bound_logger.debug(
+            f"OpenAI请求体: {json.dumps(request_dict, ensure_ascii=False)}"
+        )
 
         try:
             async with self.client.stream(
@@ -271,7 +273,7 @@ class OpenAIServiceClient:
             )
             bound_logger.error(f"Error Response: {error_summary}")
             raise OpenAIClientError(
-                await get_error_response(
+                get_error_response(
                     status_code=e.response.status_code,
                     message=f"HTTP {e.response.status_code} error",
                     details={"type": "http_error"},
@@ -281,7 +283,7 @@ class OpenAIServiceClient:
         except httpx.TimeoutException as e:
             bound_logger.error(f"OpenAI API 超时 - Error: {str(e)}")
             raise OpenAIClientError(
-                await get_error_response(
+                get_error_response(
                     status_code=504,
                     message="Request timeout",
                     details={"type": "timeout_error"},
@@ -291,7 +293,7 @@ class OpenAIServiceClient:
         except httpx.ConnectError as e:
             bound_logger.error(f"OpenAI API 连接错误 - Error: {str(e)}")
             raise OpenAIClientError(
-                await get_error_response(
+                get_error_response(
                     status_code=502,
                     message="Connection error",
                     details={"type": "connection_error"},

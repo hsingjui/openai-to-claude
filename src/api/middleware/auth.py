@@ -17,23 +17,21 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
             # 跳过认证，直接处理请求
             response = await call_next(request)
             return response
-            
+
         # 从请求头中获取API密钥
         token = request.headers.get("x-api-key")
 
         if token != self.api_key:
-            error_response = await get_error_response(401, message="API密钥无效")
+            error_response = get_error_response(401, message="API密钥无效")
 
             # 直接返回401响应，而不是抛出异常
             from fastapi.responses import JSONResponse
-            return JSONResponse(
-                status_code=401,
-                content=error_response.dict()
-            )
+
+            return JSONResponse(status_code=401, content=error_response.dict())
 
         response = await call_next(request)
         return response
-    
+
     def _requires_auth(self, path: str) -> bool:
         """检查路径是否需要API密钥验证"""
         # 只有 /v1/messages 需要密钥验证

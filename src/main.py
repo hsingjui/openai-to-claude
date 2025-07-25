@@ -125,7 +125,7 @@ async def global_exception_handler(request, exc):
     )
 
     # 使用标准错误响应格式返回客户端
-    error_response = await get_error_response(500, message="服务器内部错误，请稍后重试")
+    error_response = get_error_response(500, message="服务器内部错误，请稍后重试")
     return JSONResponse(status_code=500, content=error_response.model_dump())
 
 
@@ -146,6 +146,6 @@ async def validation_exception_handler(request, exc):
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
     """处理404错误"""
-    error_response = await get_error_response(404, message="请求的资源不存在")
+    error_response = get_error_response(404, message="请求的资源不存在")
 
     return JSONResponse(status_code=404, content=error_response.model_dump())
