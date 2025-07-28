@@ -56,13 +56,11 @@ class AnthropicRoles:
 class AnthropicMessageContent(BaseModel):
     """Anthropic消息内容项"""
 
-    type: Literal["text", "image", "tool_use", "tool_result"] = Field(
+    type: Literal["text", "thinking", "image", "tool_use", "tool_result"] = Field(
         description="内容类型"
     )
     text: str | None = Field(None, description="文本内容（当type为text时）")
-    source: dict[str, Any] | None = Field(
-        None, description="当type为image时的源信息"
-    )
+    source: dict[str, Any] | None = Field(None, description="当type为image时的源信息")
     id: str | None = Field(None, description="工具调用ID（当type为tool_use时）")
     name: str | None = Field(None, description="工具名称（当type为tool_use时）")
     input: dict[str, Any] | None = Field(
@@ -115,9 +113,7 @@ class AnthropicRequest(BaseModel):
     tools: list[AnthropicToolDefinition] | None = Field(
         None, description="可用工具定义"
     )
-    tool_choice: str | dict[str, Any] | None = Field(
-        None, description="工具选择配置"
-    )
+    tool_choice: str | dict[str, Any] | None = Field(None, description="工具选择配置")
     metadata: dict[str, Any] | None = Field(None, description="可选元数据")
     stop_sequences: list[str] | None = Field(None, description="停止序列")
     stream: bool | None = Field(False, description="是否使用流式响应")
@@ -156,9 +152,7 @@ class AnthropicContentBlock(BaseModel):
         None, description="工具输入，当type为tool_use时"
     )
     thinking: str | None = Field(None, description="思考内容，当type为thinking时")
-    signature: str | None = Field(
-        None, description="思考内容签名，当type为thinking时"
-    )
+    signature: str | None = Field(None, description="思考内容签名，当type为thinking时")
 
 
 class AnthropicUsage(BaseModel):
@@ -169,9 +163,7 @@ class AnthropicUsage(BaseModel):
     cache_creation_input_tokens: int | None = Field(
         0, description="缓存创建输入token数量"
     )
-    cache_read_input_tokens: int | None = Field(
-        0, description="缓存读取输入token数量"
-    )
+    cache_read_input_tokens: int | None = Field(0, description="缓存读取输入token数量")
     service_tier: str | None = Field("standard", description="服务层级")
 
 
