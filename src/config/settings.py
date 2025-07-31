@@ -47,7 +47,7 @@ async def reload_config(config_path: str | None = None) -> "Config":
         # 尝试加载新配置
         new_config = await Config.from_file(config_path)
         _config_instance = new_config
-        logger.info("配置重载成功")
+        logger.info(f"配置重载成功: {new_config.model_dump_json()}")
         return _config_instance
     except Exception as e:
         logger.error(f"配置重载失败，保持原配置: {e}")
@@ -131,9 +131,10 @@ class ModelConfig(BaseModel):
         description="深度思考模型，用于复杂推理任务",
         default="claude-3-7-sonnet-20250219",
     )
-    longContext: str = Field(
+    long_context: str = Field(
         description="长上下文处理模型", default="claude-3-7-sonnet-20250219"
     )
+    web_search: str = Field(description="网络搜索模型", default="gemini-2.5-flash")
 
 
 class ParameterOverridesConfig(BaseModel):

@@ -15,7 +15,6 @@ from pydantic import ValidationError
 from src.core.clients.openai_client import OpenAIServiceClient
 from src.core.converters.request_converter import (
     AnthropicToOpenAIConverter,
-    validate_anthropic_request,
 )
 from src.core.converters.response_converter import OpenAIToAnthropicConverter
 from src.models.anthropic import (
@@ -71,7 +70,7 @@ class MessagesHandler:
         try:
             bound_logger.debug("处理非流式请求")
             # 验证请求
-            await validate_anthropic_request(request, request_id)
+            # await validate_anthropic_request(request, request_id)
             # 将 Anthropic 请求转换为 OpenAI 格式（异步）
             openai_request = await self.request_converter.convert_anthropic_to_openai(
                 request, request_id
@@ -87,7 +86,7 @@ class MessagesHandler:
 
             # 将 OpenAI 响应转回 Anthropic 格式
             anthropic_response = await self.response_converter.convert_response(
-                openai_response, request.model
+                openai_response, request.model, request_id
             )
             # 安全地提取响应文本
             response_text = "empty"
@@ -122,6 +121,17 @@ class MessagesHandler:
                 details={"json_error": str(e), "request_id": request_id},
             )
             raise HTTPException(status_code=502, detail=error_response.model_dump())
+        except HTTPException as e:
+            bound_logger.exception(
+                f"处理非流式消息请求错误 - Type: {type(e).__name__}, Error: {str(e)}"
+            )
+            error_response = get_error_response(
+                e.status_code, message=str(e.detail), details={"request_id": request_id}
+            )
+            raise HTTPException(
+                status_code=e.status_code,
+                detail=error_response.model_dump(exclude_none=True),
+            )
 
         except Exception as e:
             bound_logger.exception(
@@ -130,7 +140,9 @@ class MessagesHandler:
             error_response = get_error_response(
                 500, message=str(e), details={"request_id": request_id}
             )
-            raise HTTPException(status_code=500, detail=error_response.model_dump())
+            raise HTTPException(
+                status_code=500, detail=error_response.model_dump(exclude_none=True)
+            )
 
     async def process_stream_message(
         self, request: AnthropicRequest, request_id: str = None
@@ -145,7 +157,7 @@ class MessagesHandler:
         bound_logger = get_logger_with_request_id(request_id)
 
         try:
-            await validate_anthropic_request(request, request_id)
+            # await validate_anthropic_request(request, request_id)
             openai_request = await self.request_converter.convert_anthropic_to_openai(
                 request, request_id
             )
@@ -245,9 +257,12 @@ async def messages_endpoint(request: Request, background_tasks: BackgroundTasks)
         # 解析请求体
         body = await request.json()
         # 记录请求
+        log_body = body.copy()
+        log_body["tools"] = []
         bound_logger.debug(
-            f"Anthropic请求体 - Model: {body.get('model', 'unknown')}, Messages: {len(body.get('messages', []))}, Stream: {body.get('stream', False)}\n{json.dumps(body, ensure_ascii=False)}"
+            f"Anthropic请求体 - Model: {body.get('model', 'unknown')}, Messages: {len(body.get('messages', []))}, Stream: {body.get('stream', False)}\n{json.dumps(log_body, ensure_ascii=False, indent=2)}"
         )
+
         anthropic_request = AnthropicRequest(**body)
 
         # 记录清理后的请求信息（移除敏感信息）

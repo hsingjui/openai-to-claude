@@ -32,7 +32,7 @@ class RequestTimingMiddleware(BaseHTTPMiddleware):
         request.state.request_id = request_id
 
         # 获取绑定了请求ID的logger
-        bound_logger =  get_logger_with_request_id(request_id)
+        bound_logger = get_logger_with_request_id(request_id)
 
         try:
             response = await call_next(request)
@@ -67,9 +67,9 @@ class RequestTimingMiddleware(BaseHTTPMiddleware):
 
             # 使用绑定了请求ID的logger记录错误
             # 安全构造错误日志 - 避免格式字符串问题
-            safe_url = str(request.url) if hasattr(request, 'url') else "unknown"
-            safe_method = request.method if hasattr(request, 'method') else "unknown"
-            
+            safe_url = str(request.url) if hasattr(request, "url") else "unknown"
+            safe_method = request.method if hasattr(request, "method") else "unknown"
+
             bound_logger.error(
                 "请求处理错误",
                 error_type=type(exc).__name__,

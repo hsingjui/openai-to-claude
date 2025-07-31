@@ -7,6 +7,7 @@ OpenAI-to-Claude请求转换器
 import json
 from typing import Any
 
+from fastapi import HTTPException
 from loguru import logger
 
 from src.common.token_counter import TokenCounter
@@ -30,7 +31,9 @@ class AnthropicToOpenAIConverter:
     """将Anthropic请求转换为OpenAI格式"""
 
     @staticmethod
-    async def get_target_model(anthropic_request: AnthropicRequest) -> str:
+    async def get_target_model(
+        anthropic_request: AnthropicRequest, request_id: str = None
+    ) -> str:
         """
         Args:
             anthropic_request: Anthropic特定请求对象
@@ -76,7 +79,26 @@ class AnthropicToOpenAIConverter:
             anthropic_request.tools,
         )
         if total_tokens > 1000 * 100:
-            resolved_model = config.models.longContext
+            resolved_model = config.models.long_context
+
+        # 缓存token数量用于后续响应处理
+        if request_id:
+            from src.common.token_cache import cache_tokens
+
+            cache_tokens(request_id, total_tokens)
+
+        if anthropic_request.tools:
+            has_web_search = any(
+                tool.type and "web_search" in tool.type
+                for tool in anthropic_request.tools
+            )
+            if has_web_search:
+                resolved_model = config.models.web_search
+                if "gemini" not in resolved_model:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Web search is only supported with Gemini models",
+                    )
 
         return resolved_model
 
@@ -86,7 +108,7 @@ class AnthropicToOpenAIConverter:
         request_id: str = None,
     ) -> OpenAIRequest:
         """
-        将Anthropic请求转换为OpenAI格式请求（异步版本）
+        将Anthropic请求转换为OpenAI格式请求
 
         Args:
             anthropic_request: Anthropic格式的请求
@@ -102,7 +124,7 @@ class AnthropicToOpenAIConverter:
 
         # 动态选择目标模型
         target_model = await AnthropicToOpenAIConverter.get_target_model(
-            anthropic_request
+            anthropic_request, request_id
         )
 
         bound_logger.debug(
@@ -192,8 +214,10 @@ class AnthropicToOpenAIConverter:
         bound_logger.info(
             f"模型转换完成 - Anthropic: {anthropic_request.model} -> OpenAI: {openai_request.model}"
         )
+        log_openai_request = openai_request.model_copy()
+        log_openai_request.tools = []
         bound_logger.debug(
-            f"OpenAI 请求体: {openai_request.model_dump_json(exclude_none=True)}"
+            f"OpenAI 请求体: {log_openai_request.model_dump_json(exclude_none=True)}"
         )
         return openai_request
 
@@ -440,17 +464,29 @@ class AnthropicToOpenAIConverter:
         if not anthropic_tools:
             return None
 
+        has_web_search = any(
+            tool.type and "web_search" in tool.type for tool in anthropic_tools
+        )
         openai_tools = []
-        for tool in anthropic_tools:
+        if has_web_search:
             openai_tool = OpenAITool(
                 type="function",
                 function=OpenAIToolFunction(
-                    name=tool.name,
-                    description=tool.description,
-                    parameters=tool.input_schema,
+                    name="googleSearch",
                 ),
             )
             openai_tools.append(openai_tool)
+        else:
+            for tool in anthropic_tools:
+                openai_tool = OpenAITool(
+                    type="function",
+                    function=OpenAIToolFunction(
+                        name=tool.name,
+                        description=tool.description,
+                        parameters=tool.input_schema,
+                    ),
+                )
+                openai_tools.append(openai_tool)
 
         return openai_tools if openai_tools else None
 

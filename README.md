@@ -216,10 +216,11 @@ openai-to-claude/
     "level": "INFO"
   },
   "models": {
-    "default": "claude-3-5-sonnet-20241022",
-    "small": "claude-3-5-haiku-20241022",
-    "think": "claude-3-7-sonnet-20250219",
-    "longContext": "claude-3-7-sonnet-20250219"
+    "default": "Qwen/Qwen3-Coder",
+    "small": "deepseek-ai/DeepSeek-V3-0324",
+    "think": "deepseek-ai/DeepSeek-R1-0528",
+    "long_context": "gemini-2.5-pro",
+    "web_search": "gemini-2.5-flash"
   },
   "parameter_overrides": {
     "max_tokens": null,
@@ -249,7 +250,8 @@ openai-to-claude/
   - `default`: Default general model for general requests
   - `small`: Lightweight model for simple tasks
   - `think`: Deep thinking model for complex reasoning tasks
-  - `longContext`: Long context processing model for handling long text
+  - `long_context`: Long context processing model for handling long text
+  - `web_search`: Web search model for web search, currently supports geimini
 
 - **parameter_overrides**: Parameter override configuration, allows administrators to set model parameter override values in the configuration file
   - `max_tokens`: Maximum token count override, when set, will override the max_tokens parameter in client requests

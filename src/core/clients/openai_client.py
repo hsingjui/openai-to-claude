@@ -212,12 +212,7 @@ class OpenAIServiceClient:
         bound_logger.info(
             f"发送OpenAI流式请求 - URL: {url}, Model: {request_dict.get('model', 'unknown')}, Messages: {len(request_dict.get('messages', []))}, Stream: True"
         )
-
-        # 在DEBUG级别下记录完整请求数据
-        bound_logger.debug(
-            f"OpenAI请求体: {json.dumps(request_dict, ensure_ascii=False)}"
-        )
-
+        
         try:
             async with self.client.stream(
                 "POST",

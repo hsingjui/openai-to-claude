@@ -1,6 +1,6 @@
 """Anthropic API 数据模型定义"""
 
-from typing import Any, Literal, Union
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -97,8 +97,12 @@ class AnthropicToolDefinition(BaseModel):
     """Anthropic工具定义"""
 
     name: str = Field(description="工具名称")
-    description: str = Field(description="工具描述")
-    input_schema: dict[str, Any] = Field(description="JSON Schema格式的输入参数定义")
+    description: Optional[str] = Field(None, description="工具描述")
+    input_schema: Optional[dict[str, Any]] = Field(
+        None, description="JSON Schema格式的输入参数定义"
+    )
+    type: Optional[str] = Field(None, description="工具名称")
+    max_uses: Optional[int] = Field(None, description="工具名称")
 
 
 class AnthropicRequest(BaseModel):
@@ -158,8 +162,8 @@ class AnthropicContentBlock(BaseModel):
 class AnthropicUsage(BaseModel):
     """Anthropic使用统计"""
 
-    input_tokens: int = Field(0, description="输入token数量")
-    output_tokens: int | None = Field(0, description="输出token数量")
+    input_tokens: int = Field(1, description="输入token数量")
+    output_tokens: int | None = Field(1, description="输出token数量")
     cache_creation_input_tokens: int | None = Field(
         0, description="缓存创建输入token数量"
     )

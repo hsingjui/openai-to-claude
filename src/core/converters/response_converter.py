@@ -10,6 +10,7 @@ import traceback
 from collections.abc import AsyncIterator
 from typing import Any
 
+from ...common.token_cache import get_cached_tokens
 from loguru import logger
 
 from src.models.anthropic import (
@@ -43,6 +44,7 @@ class OpenAIToAnthropicConverter:
     async def convert_response(
         openai_response: dict[str, Any],
         original_model: str = None,
+        request_id: str = None,
     ) -> AnthropicMessageResponse:
         """
         将OpenAI非流式响应转换为Anthropic格式
@@ -50,6 +52,7 @@ class OpenAIToAnthropicConverter:
         Args:
             openai_response: OpenAI响应字典
             original_model: 原始请求的Anthropic模型
+            request_id: 请求ID，用于获取缓存的token数量
 
         Returns:
             AnthropicMessageResponse: 转换后的Anthropic格式响应
@@ -84,7 +87,9 @@ class OpenAIToAnthropicConverter:
 
         # 转换使用统计
         usage_data = openai_response.get("usage", {})
-        usage = OpenAIToAnthropicConverter._convert_usage(usage_data)
+        usage = OpenAIToAnthropicConverter._convert_usage(
+            usage_data, request_id, content_blocks
+        )
 
         # 确定模型ID
         model = OpenAIToAnthropicConverter.extract_model_name(
@@ -215,19 +220,41 @@ class OpenAIToAnthropicConverter:
         return content_blocks
 
     @staticmethod
-    def _convert_usage(usage_data: dict[str, Any]) -> AnthropicUsage:
+    def _convert_usage(
+        usage_data: dict[str, Any], request_id: str = None, content_blocks: list = None
+    ) -> AnthropicUsage:
         """
-        将OpenAI使用统计转换为Anthropic格式
+        将OpenAI使用统计转换为Anthropic格式，支持缓存fallback
 
         Args:
             usage_data: OpenAI使用统计数据
+            request_id: 请求ID，用于获取缓存的token数量
+            content_blocks: 内容块列表，用于计算输出token数量
 
         Returns:
             AnthropicUsage: Anthropic格式的使用统计
         """
+        prompt_tokens = usage_data.get("prompt_tokens", 0) if usage_data else 0
+        completion_tokens = usage_data.get("completion_tokens", 0) if usage_data else 0
+
+        # 如果OpenAI没有返回prompt_tokens，使用缓存的值
+        if not prompt_tokens and request_id:
+            from src.common.token_cache import get_cached_tokens
+
+            cached_tokens = get_cached_tokens(request_id)
+            if cached_tokens:
+                prompt_tokens = cached_tokens
+
+        # 如果OpenAI没有返回completion_tokens，使用我们的计算方法
+        if not completion_tokens and content_blocks:
+            from src.common.token_counter import token_counter
+
+            # 使用同步版本，保持简单性（KISS原则）
+            completion_tokens = token_counter.count_response_tokens(content_blocks)
+
         return AnthropicUsage(
-            input_tokens=usage_data.get("prompt_tokens", 0),
-            output_tokens=usage_data.get("completion_tokens", 0),
+            input_tokens=prompt_tokens,
+            output_tokens=completion_tokens,
         )
 
     @staticmethod
@@ -323,12 +350,17 @@ class OpenAIToAnthropicConverter:
 
                         # 发送 message_start 事件
                         if not state.has_started and not state.has_finished:
+                            # 获取input token缓存
+                            input_tokens = 0
+                            cached_tokens = get_cached_tokens(request_id)
+                            if cached_tokens:
+                                input_tokens = cached_tokens
                             state.has_started = True
                             message_start = AnthropicStreamMessage(
                                 message=AnthropicStreamMessageStartMessage(
                                     id=state.message_id,
                                     model=model,
-                                    usage=AnthropicUsage(),
+                                    usage=AnthropicUsage(input_tokens=input_tokens),
                                 ),
                             )
                             yield format_event(
@@ -385,7 +417,9 @@ class OpenAIToAnthropicConverter:
                         # 处理完成事件
                         finish_reason = choice.get("finish_reason")
                         if finish_reason:
-                            finish_events = process_finish_event(chunk_data, state)
+                            finish_events = process_finish_event(
+                                chunk_data, state, request_id
+                            )
                             for event in finish_events:
                                 yield event
                             break
@@ -428,6 +462,8 @@ class StreamState:
         self.has_finished = False
         # 思考内容开始
         self.thinking_started = False
+        # 思考内容结束
+        self.thinking_finish = False
         # 内容块索引
         self.content_index = 0
         self.buffer = ""
@@ -442,6 +478,9 @@ class StreamState:
         # 工具调用管理
         self.tool_calls: dict[int, dict[str, Any]] = {}
         self.tool_call_index_to_content_block_index: dict[int, int] = {}
+
+        # 新增：累积所有输出内容用于token计算
+        self.accumulated_content: list[str] = []
 
 
 def check_thinking_content(delta: dict[str, Any], state: StreamState) -> bool:
@@ -508,6 +547,11 @@ def process_regular_content(delta: dict[str, Any], state: StreamState) -> list[s
             format_event(AnthropicStreamEventTypes.PING, AnthropicPing().model_dump())
         )
 
+    # 累积内容用于token计算
+    content = delta.get("content", "")
+    if content:
+        state.accumulated_content.append(content)
+
     anthropic_chunk = AnthropicStreamContentBlock(
         index=state.content_index,
         delta=Delta(
@@ -529,10 +573,8 @@ def process_thinking_content(delta: dict[str, Any], state: StreamState) -> list[
     events = []
 
     is_thinking = check_thinking_content(delta, state)
-    if not is_thinking:
-        return events
 
-    if not state.thinking_started:
+    if not state.thinking_started and is_thinking:
         state.thinking_started = True
         content_block_start = AnthropicStreamContentBlockStart(
             index=state.content_index,
@@ -551,17 +593,21 @@ def process_thinking_content(delta: dict[str, Any], state: StreamState) -> list[
             format_event(AnthropicStreamEventTypes.PING, AnthropicPing().model_dump())
         )
 
+    # print(f"is_thinking: {is_thinking}")
     # 提取思考内容
     thinking_content = None
-    if state.thinking_mode == 1:
-        content = delta.get("content")
-        if "</think>" in content or "</thinking>" in content:
-            state.thinking_mode = None
-        thinking_content = content.replace("<think>", "").replace("</think>", "")
-    elif state.thinking_mode == 2:
-        thinking_content = delta["reasoning_content"]
+    if state.thinking_mode is not None:
+        if state.thinking_mode == 1:
+            content = delta.get("content")
+            if "</think>" in content or "</thinking>" in content:
+                state.thinking_mode = None
+            thinking_content = content.replace("<think>", "").replace("</think>", "")
+        elif state.thinking_mode == 2:
+            thinking_content = delta.get("reasoning_content")
 
     if thinking_content is not None and thinking_content != "":
+        # 累积思考内容用于token计算
+        state.accumulated_content.append(thinking_content)
         # 处理普通思考内容
         thinking_chunk = AnthropicStreamContentBlock(
             index=state.content_index,
@@ -577,10 +623,10 @@ def process_thinking_content(delta: dict[str, Any], state: StreamState) -> list[
             )
         )
 
-    if thinking_content is None or state.thinking_mode is None:
+    if thinking_content is None and not state.thinking_finish:
         # 结束思考
         state.thinking_mode = None
-
+        state.thinking_finish = True
         # signature_delta
         signature_delta = AnthropicStreamContentBlock(
             index=state.content_index,
@@ -659,6 +705,10 @@ def process_tool_calls(delta: dict[str, Any], state: StreamState) -> list[str]:
                 tool_call.get("function", {}).get("name") or f"tool_{tool_call_index}"
             )
 
+            # 累积工具名称用于token计算
+            if tool_call_name and not tool_call_name.startswith("tool_"):
+                state.accumulated_content.append(tool_call_name)
+
             # 创建内容块开始事件
             content_block_start = AnthropicStreamContentBlockStart(
                 index=state.content_index,
@@ -708,6 +758,9 @@ def process_tool_calls(delta: dict[str, Any], state: StreamState) -> list[str]:
         # 处理工具调用参数
         function_args = tool_call.get("function", {}).get("arguments")
         if function_args and not state.has_finished:
+            # 累积工具调用参数用于token计算
+            state.accumulated_content.append(function_args)
+
             if tool_call_index in state.tool_calls:
                 state.tool_calls[tool_call_index]["arguments"] += function_args
 
@@ -759,7 +812,11 @@ def process_tool_calls(delta: dict[str, Any], state: StreamState) -> list[str]:
     return events
 
 
-def process_finish_event(chunk_data: dict[str, Any], state: StreamState) -> list[str]:
+def process_finish_event(
+    chunk_data: dict[str, Any],
+    state: StreamState,
+    request_id: str = None,
+) -> list[str]:
     """处理完成事件"""
     events = []
     state.has_finished = True
@@ -789,7 +846,31 @@ def process_finish_event(chunk_data: dict[str, Any], state: StreamState) -> list
     anthropic_stop_reason = stop_reason_mapping.get(finish_reason, "end_turn")
 
     # 发送 message_delta 事件
-    usage_data = choice.get("usage", {})
+    usage_data = choice.get("usage", None)
+    if usage_data is None:
+        usage_data = chunk_data.get("usage", {})
+    # 计算输出token数量
+    input_tokens = usage_data.get("prompt_tokens", 0)
+    if input_tokens is None or input_tokens == 0:
+        cached_tokens = get_cached_tokens(request_id, True)
+        if cached_tokens:
+            input_tokens = cached_tokens
+    completion_tokens = usage_data.get("completion_tokens", 0)
+    # 如果OpenAI没有返回completion_tokens，使用我们的计算方法
+    if not completion_tokens and state.accumulated_content:
+        from src.common.token_counter import token_counter
+
+        # 将累积的内容转换为内容块格式，复用现有计算逻辑
+        mock_content_blocks = []
+        combined_text = "".join(state.accumulated_content)
+        if combined_text:
+            # 创建模拟内容块（与现有TokenCounter.count_response_tokens兼容）
+            mock_content_blocks.append(
+                type("ContentBlock", (), {"text": combined_text})()
+            )
+
+        completion_tokens = token_counter.count_response_tokens(mock_content_blocks)
+
     message_delta = AnthropicStreamMessage(
         type=AnthropicStreamEventTypes.MESSAGE_DELTA,
         delta=MessageDelta(
@@ -797,8 +878,8 @@ def process_finish_event(chunk_data: dict[str, Any], state: StreamState) -> list
             stop_sequence=None,
         ),
         usage=AnthropicUsage(
-            input_tokens=usage_data.get("prompt_tokens", 0),
-            output_tokens=usage_data.get("completion_tokens", 0),
+            input_tokens=input_tokens,
+            output_tokens=completion_tokens,  # 使用计算得到的值
         ),
     )
     events.append(

@@ -242,10 +242,11 @@ openai-to-claude/
     "level": "INFO"
   },
   "models": {
-    "default": "claude-3-5-sonnet-20241022",
-    "small": "claude-3-5-haiku-20241022",
-    "think": "claude-3-7-sonnet-20250219",
-    "longContext": "claude-3-7-sonnet-20250219"
+    "default": "Qwen/Qwen3-Coder",
+    "small": "deepseek-ai/DeepSeek-V3-0324",
+    "think": "deepseek-ai/DeepSeek-R1-0528",
+    "long_context": "gemini-2.5-pro",
+    "web_search": "gemini-2.5-flash"
   },
   "parameter_overrides": {
     "max_tokens": null,
@@ -275,7 +276,8 @@ openai-to-claude/
   - `default`: 默认通用模型，用于一般请求
   - `small`: 轻量级模型，用于简单任务
   - `think`: 深度思考模型，用于复杂推理任务
-  - `longContext`: 长上下文处理模型，用于处理长文本
+  - `long_context`: 长上下文处理模型，用于处理长文本
+  - `web_search`: 网络搜索模型，用于网络搜索，目前支持geimini
 
 - **parameter_overrides**: 参数覆盖配置，允许管理员在配置文件中设置模型参数的覆盖值
   - `max_tokens`: 最大 token 数覆盖，设置后会覆盖客户端请求中的 max_tokens 参数

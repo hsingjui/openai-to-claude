@@ -15,7 +15,8 @@
     "default": "Qwen/Qwen3-Coder",
     "small": "deepseek-ai/DeepSeek-V3-0324",
     "think": "deepseek-ai/DeepSeek-R1-0528",
-    "longContext": "gemini-2.5-pro"
+    "long_context": "gemini-2.5-pro",
+    "web_search": "gemini-2.5-flash"
   },
   "parameter_overrides": {
     "max_tokens": null,
