@@ -125,7 +125,7 @@ async def generate_request_id() -> str:
     Returns:
         str: 格式为 req_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx 的请求ID
     """
-    return f"req_{uuid.uuid4()}"
+    return f"req_{uuid.uuid4().hex}"
 
 
 async def should_enable_request_id() -> bool:
